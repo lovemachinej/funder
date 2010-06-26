@@ -109,7 +109,9 @@ Note that I didn't have to explicitly set the width and height of the actual pix
 
 You _can_ explicitly set a different height/width than what is defined in the IHDR chunk.
 
-`formats/png.rb` was my guinea-pig for developing all of the functionality and syntactic sugar.  Looking over how it works will explain a lot.  I don't think I'll be adding any other data-formats I've defined to the repository though.  Here's a basic example on how to define a data format with `Funder`:
+`formats/png.rb` was my guinea-pig for developing all of the functionality and syntactic sugar.  Looking over how it works will explain a lot.  I don't think I'll be adding any other data-formats I've defined to the repository though.  Gotta leave you some of the fun :^)
+
+Here's a basic example on how to define a data format with `Funder`:
 
 {{{
 class A < Funder
