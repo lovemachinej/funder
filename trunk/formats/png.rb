@@ -32,11 +32,11 @@ class IDAT < Chunk
 		unfield :color_type, Int
 
 		field :pixel_data, Str, lambda {
+			w = width.value || @parent.parent.ihdr.data.width.value || rand(10)+1
+			h = height.value || @parent.parent.ihdr.data.height.value || rand(10)+1
 			c_type = color_type.value || @parent.parent.ihdr.data.color_type.value || 2
 			case c_type
 			when 2 # true color
-				w = width.value || rand(10)+1
-				h = height.value || rand(10)+1
 				h.times.map do
 					"\x00" +
 					w.times.map do
@@ -47,8 +47,6 @@ class IDAT < Chunk
 					end.join
 				end.join
 			when 6 # true color w/ alpha
-				w = width.value || rand(10)+1
-				h = height.value || rand(10)+1
 				h.times.map do
 					"\x00" +
 					w.times.map do
@@ -60,8 +58,6 @@ class IDAT < Chunk
 					end.join
 				end.join
 			else
-				w = width.value || rand(10)+1
-				h = height.value || rand(10)+1
 				h.times.map do
 					"\x00" +
 					w.times.map do
@@ -245,20 +241,20 @@ end
 class Png < Funder
 	field :png_header, Str, "\211PNG\r\n\032\n"
 	field :ihdr, IHDR
-	field :chrm, CHRM
+	# field :chrm, CHRM
 	field :srgb, SRGB
-	field :sbit, SBIT
-	field :trns, TRNS
-	field :gama, GAMA
-	field :splt, SPLT, nil, :mult=>true, :mult_max=>2
-	field :bkgd, BKGD
-	field :plte, PLTE
-	field :hist, HIST
-	field :phys, PHYS
-	field :time, TIME
+	# field :sbit, SBIT
+	# field :trns, TRNS
+	# field :gama, GAMA
+	# field :splt, SPLT, nil, :mult=>true, :mult_max=>2
+	# field :bkgd, BKGD
+	# field :plte, PLTE
+	# field :hist, HIST
+	# field :phys, PHYS
+	# field :time, TIME
 	field :idat, IDAT
-	field :text, TEXT, nil, :mult=>true, :mult_max=>2
-	field :ztxt, ZTXT, nil, :mult=>true, :mult_max=>2
-	field :itxt, ITXT, nil, :mult=>true, :mult_max=>2
+	# field :text, TEXT, nil, :mult=>true, :mult_max=>2
+	# field :ztxt, ZTXT, nil, :mult=>true, :mult_max=>2
+	# field :itxt, ITXT, nil, :mult=>true, :mult_max=>2
 	field :iend, IEND
 end
