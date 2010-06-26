@@ -2,7 +2,7 @@
 
 = Examples =
 
-Below are some brief usage examples:
+Below are some brief usage examples(**NOTE** I haven't made it pretty to use via irb yet -- it'll spit out _tons_ of `inspect` data):
 
 This example creates a yellow png with a width of 10 and a height of 20 and half transparency.  For now, you might want to comment out in formats/png.rb the different png chunks you don't need/want.  Eventually I'll add in a more elegant way to exclude defined fields.
 
