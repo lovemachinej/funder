@@ -1,0 +1,1 @@
+#summary Documentation on how inheritance works within Funder
