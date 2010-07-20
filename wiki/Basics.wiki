@@ -5,13 +5,13 @@
 This wiki page is designed to get you up to speed so you can use `Funder`. Links to more in-depth documentation
 on different aspects of `Funder` are listed below:
 
- *  
- *  
- *  
+ * http://code.google.com/p/funder/wiki/Fields
+ * http://code.google.com/p/funder/wiki/Actions
+ * http://code.google.com/p/funder/wiki/Inheritance
 
 = Funder Description =
 
-Funder (*F*ormat*UNDER*stander) is a Ruby library that can be used to define data-formats.  To make use of Funder,
+Funder (*F* ormat *UNDER* stander) is a Ruby library that can be used to define data-formats.  To make use of Funder,
 you must make a Ruby class that descends from the Funder class.  I have always used PNG as my guinea pig for this project.
 No need to stop now. (In case anybody wants to understand the PNG format better, w3c's specs are pretty good:
 http://www.w3.org/TR/PNG/, as are libpng's at http://www.libpng.org/pub/png/libpng-1.4.0-manual.pdf)
