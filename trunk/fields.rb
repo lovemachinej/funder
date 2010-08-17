@@ -64,6 +64,9 @@ class Field
 	def gen_val(v)
 		v
 	end
+	def result_length
+		raise "Inheriting classes should define this method (result_length), current class: #{self.class.to_s}"
+	end
 	def reset
 		@cache = nil
 	end
@@ -96,6 +99,9 @@ class Str < Field
 	def gen_val(v)
 		val = v || gen_rand
 		val.to_s
+	end
+	def result_length
+		self.to_out.length
 	end
 end
 
@@ -130,6 +136,13 @@ class MultField < Str
 	def length
 		@order.length
 	end
+	def result_length
+		res = 0
+		@order.each do |field|
+			res += field.result_length
+		end
+		res
+	end
 	def set_val_parent
 		@order.each {|f| f.parent = @parent}
 	end
@@ -146,12 +159,29 @@ class MultField < Str
 end
 
 class Int < Field
+	def pack
+		@options[:p] || "N"
+	end
 	def gen_val(v)
-		pack = @options[:p] || "N"
 		min = @options[:min] || 0
 		max = @options[:max] || (1<<32)-1
 		val = v || rand(max - min) + min
 		[val].pack(pack)
+	end
+	def result_length
+		res = 0
+		if %w{D d E G Q q}.include? pack
+			res = 8 # 64 bit
+		elsif %w{w}.include? pack
+			res = 5 # 40 bit
+		elsif %w{e F f g I i L l N V}.include? pack
+			res = 4 # 32 bit
+		elsif %w{n S s v}.include? pack
+			res = 2 # 16 bit
+		elsif %w{C c}.include? pack
+			res = 1 # 8 bit
+		end
+		res
 	end
 end
 
