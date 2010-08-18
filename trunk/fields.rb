@@ -25,15 +25,25 @@
 
 require 'funder'
 require 'actions'
+require 'base64'
 
 class Field
-	attr_accessor :name, :value, :parent, :options
-	def initialize(name, value, options)
+	attr_accessor :name, :value, :parent, :options, :cache, :action
+	def initialize(name, value, options={})
 		@name = name
 		@value = value
-		@options = options
+		@options = options || {}
 		@parent = nil
+
+		pull_options()
+
 		set_val_parent
+	end
+	# inheriting classes need to implement this as well (and call super)
+	def pull_options
+		if @options[:action]
+			@action = @options[:action].create
+		end
 	end
 	def set_val_parent
 		@value.parent = @parent if @value.respond_to?(:parent=)
@@ -59,6 +69,11 @@ class Field
 		else
 			res = @value
 		end
+
+		if @action
+			res = @action.do_it_once(res)
+		end
+
 		@cache ||= gen_val(res)
 	end
 	def gen_val(v)
@@ -85,19 +100,49 @@ class Field
 		return full_name <=> other.full_name if other.respond_to?(:full_name)
 		full_name <=> other.to_s
 	end
+	def detail_inspect(level=0)
+		return ""
+	end
+	def inspect_value(level=0)
+		return @value.inspect(level+1)
+	end
 	def inspect(level=0)
-		raise "Inheriting classes should define this method [inspect(level=0)], current class: #{self.class.to_s}"
+		if level == 0
+
+			res = "#<#{self.class.to_s} name=#{@name.to_s.inspect} value=#{inspect_value}"
+			if @cache
+				res << " cache=#{(@cache.length > 17 ? @cache.slice(0, 17) + "..." : @cache).inspect}"
+			else
+				res << " cache=nil"
+			end
+			if @action
+				res << " action=#{@action.desc}"
+			end
+			res << "#{detail_inspect()}>"
+		elsif level == 1 || level == 2
+			if @action
+				"#{@action.desc}(#{inspect_value(level)})"
+			else
+				inspect_value(level)
+			end
+		else
+			return ""
+		end
 	end
 end
 
 class Str < Field
+	attr_accessor :charset, :min, :max
+	def pull_options
+		super()
+		@min = @options[:min] || rand(10)
+		@max = @options[:max] || rand(10)
+		@min,@max = @max,@min if @min > @max
+		@max = @min + 1 if @min == @max
+		@charset = @options[:charset] || "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	end
 	def gen_rand
-		min = @options[:min] || rand(10)
-		max = @options[:max] || rand(10)
-		charset = @options[:charset] || "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		min,max = max,min if min > max
-		max = min + 1 if min == max
-		(rand(max - min)+min).times.map{charset[rand(charset.length),1]}.join
+		(rand(@max - @min)+@min).times.map{@charset[rand(@charset.length),1]}.join
 	end
 	def gen_val(v)
 		val = v || gen_rand
@@ -106,11 +151,15 @@ class Str < Field
 	def result_length
 		self.to_out.length
 	end
-	def inspect(level=0)
+	def detail_inspect(level=0)
+		charset_out = (@charset.length > 20 ? @charset.slice(0, 17) + "..." : @charset).inspect
+		return " charset=#{charset_out} min=#{@min} max=#{@max}"
+	end
+	def inspect_value(level=0)
 		out = ""
 		if @value.kind_of? String
-			out = @value
-			out = (out.length > 10 ? out.slice(0, 7) + "..." : out).inspect
+			out = gen_val(@value)
+			out = (out.length > 20 ? out.slice(0, 17) + "..." : out).inspect
 		elsif @value.kind_of? Action
 			out = @value.inspect(level + 1)
 		elsif @value.kind_of? Proc
@@ -118,17 +167,9 @@ class Str < Field
 		else
 			out = @value
 		end
-
-		if level == 0
-			return "#<Str name=#{@name.to_s.inspect} value=#{out}>"
-		elsif level == 1
-			return out
-		else
-			return ""
-		end
+		out
 	end
 end
-
 
 class MultField < Str
 	include Enumerable
@@ -151,6 +192,7 @@ class MultField < Str
 			@order << @klass.new("#{name}[#{i}]".to_sym, value, options)
 		end
 	end
+	# in this case, we don't want the default inspect function
 	def inspect(level=0)
 		if level==0
 			return "#<#{@klass.to_s}* length=#{length}>"
@@ -194,31 +236,36 @@ class MultField < Str
 end
 
 class Int < Field
-	def pack
-		@options[:p] || "N"
-	end
+	attr_accessor :pack
 	def gen_val(v)
 		min = @options[:min] || 0
 		max = @options[:max] || (1<<32)-1
 		val = v || rand(max - min) + min
-		[val].pack(pack)
+		[val].pack(@pack)
 	end
 	def result_length
 		res = 0
-		if %w{D d E G Q q}.include? pack
+		if %w{D d E G Q q}.include? @pack
 			res = 8 # 64 bit
-		elsif %w{w}.include? pack
+		elsif %w{w}.include? @pack
 			res = 5 # 40 bit
-		elsif %w{e F f g I i L l N V}.include? pack
+		elsif %w{e F f g I i L l N V}.include? @pack
 			res = 4 # 32 bit
-		elsif %w{n S s v}.include? pack
+		elsif %w{n S s v}.include? @pack
 			res = 2 # 16 bit
-		elsif %w{C c}.include? pack
+		elsif %w{C c}.include? @pack
 			res = 1 # 8 bit
 		end
 		res
 	end
-	def inspect(level=0)
+	def pull_options
+		super()
+		@pack ||= @options[:p] || "N"
+	end
+	def detail_inspect(level=0)
+		return " pack=#{@pack.inspect}"
+	end
+	def inspect_value(level=0)
 		out = ""
 		if @value.kind_of? Numeric
 			out = @value.to_s
@@ -230,16 +277,7 @@ class Int < Field
 		else
 			out = @value.inspect
 		end
-
-		if level == 0
-			"#<Int name=#{@name.to_s.inspect} value=#{out}>"
-		elsif level == 1
-			"Int(#{out})"
-		elsif level == 2
-			out
-		else
-			return ""
-		end
+		out
 	end
 end
 
