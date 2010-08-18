@@ -85,6 +85,9 @@ class Field
 		return full_name <=> other.full_name if other.respond_to?(:full_name)
 		full_name <=> other.to_s
 	end
+	def inspect(level=0)
+		raise "Inheriting classes should define this method [inspect(level=0)], current class: #{self.class.to_s}"
+	end
 end
 
 class Str < Field
@@ -102,6 +105,27 @@ class Str < Field
 	end
 	def result_length
 		self.to_out.length
+	end
+	def inspect(level=0)
+		out = ""
+		if @value.kind_of? String
+			out = @value
+			out = (out.length > 10 ? out.slice(0, 7) + "..." : out).inspect
+		elsif @value.kind_of? Action
+			out = @value.inspect(level + 1)
+		elsif @value.kind_of? Proc
+			out = "lambda{..}"
+		else
+			out = @value
+		end
+
+		if level == 0
+			return "#<Str name=#{@name.to_s.inspect} value=#{out}>"
+		elsif level == 1
+			return out
+		else
+			return ""
+		end
 	end
 end
 
@@ -125,6 +149,17 @@ class MultField < Str
 		@order = []
 		num.times do |i|
 			@order << @klass.new("#{name}[#{i}]".to_sym, value, options)
+		end
+	end
+	def inspect(level=0)
+		if level==0
+			return "#<#{@klass.to_s}* length=#{length}>"
+		elsif level==1
+			return "#<#{@klass.to_s}>"
+		elsif level==2
+			return @klass.to_s
+		else
+			return ""
 		end
 	end
 	def [](int)
@@ -182,6 +217,29 @@ class Int < Field
 			res = 1 # 8 bit
 		end
 		res
+	end
+	def inspect(level=0)
+		out = ""
+		if @value.kind_of? Numeric
+			out = @value.to_s
+			out = (out.length > 10 ? out.slice(0, 7) + "..." : out)
+		elsif @value.kind_of? Action
+			out = @value.inspect(level + 1)
+		elsif @value.kind_of? Proc
+			out = "lambda{..}"
+		else
+			out = @value.inspect
+		end
+
+		if level == 0
+			"#<Int name=#{@name.to_s.inspect} value=#{out}>"
+		elsif level == 1
+			"Int(#{out})"
+		elsif level == 2
+			out
+		else
+			return ""
+		end
 	end
 end
 

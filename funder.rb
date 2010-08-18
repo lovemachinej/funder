@@ -144,6 +144,22 @@ class Funder < Str
 		super
 		@order.each {|f| f.reset }
 	end
+	def inspect(level=0)
+		if level == 0
+			res = "#<#{self.class.to_s} "
+			fields_str = @order.map do |field|
+				"#{field.name}=#{field.inspect(level+1)}"
+			end.join(" ")
+			res += fields_str + ">"
+			return res
+		elsif level == 1
+			return "#<#{self.class.to_s}>"
+		elsif level == 2
+			return self.class.to_s
+		else
+			return ""
+		end
+	end
 end
 
 class Section < Funder
