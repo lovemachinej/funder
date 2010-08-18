@@ -25,6 +25,7 @@
 
 require 'fields'
 require 'actions'
+require 'syntactic_sugar'
 
 class Array
 	def append_or_replace(val, &block)
@@ -85,6 +86,8 @@ end
 
 class Funder < Str
 	class << self
+		include SyntacticSugar
+
 		attr_accessor :order
 		def field(name, klass, value=nil, options={})
 			@order ||= []
@@ -143,6 +146,7 @@ class Funder < Str
 	def reset
 		super
 		@order.each {|f| f.reset }
+		nil
 	end
 	def inspect(level=0)
 		if level == 0

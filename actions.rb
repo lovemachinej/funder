@@ -28,33 +28,48 @@ require 'fields'
 
 class Action
 	attr_accessor :parent, :block, :fields
-	def initialize(block=nil)
+	def initialize(block=nil, do_it_once_str=nil)
 		@block = block
+		@do_it_once_str = do_it_once_str
 	end
 	def get_fields
-		@parent.instance_eval &block
+		if @do_it_once_str
+			if @do_it_once_str.kind_of? Proc
+				[Field.new(nil, (instance_eval &(@do_it_once_str)), nil)]
+			elsif @do_it_once_str.kind_of? String
+				[Field.new(nil, @do_it_once_str, nil)]
+			else
+				raise "Unknown type of do_it_once_str"
+			end
+		elsif @block
+			@parent.instance_eval &block
+		end
 	end
 	def do_it
 		raise "this should be done by inherited classes"
 	end
 	def do_it_once(str)
+		# need to do some fu here so it works as an action with a section
 		self.class.class_eval { alias :real_get_fields :get_fields }
 		self.class.send(:define_method, :get_fields) { [Field.new(nil,str,nil)] }
 		result = do_it
 		self.class.class_eval { alias :get_fields :real_get_fields }
 		result
 	end
+	def desc
+		"Action:#{self.class.to_s}"
+	end
 	def inspect(level=0)
-		@fields ||= get_fields()
-		fields_str = fields.map do |field|
+		@fields ||= get_fields() || []
+		fields_str = @fields.map do |field|
 			field.name
 		end.join(", ")
 		if level == 0
-			return "#<Action:#{self.class.to_s} fields=[#{fields_str}]>"
+			return "#<#{desc} fields=[#{fields_str}]>"
 		elsif level == 1
-			return "Action:#{self.class.to_s}(#{fields_str})"
+			return "#{desc}(#{fields_str})"
 		elsif level == 2
-			return "Action:#{self.class.to_s}(#{fields_str})"
+			return "#{desc}(#{fields_str})"
 		else
 			return ""
 		end
@@ -85,6 +100,31 @@ class ZlibDeflate < Action
 	def do_it
 		require 'zlib'
 		Zlib::Deflate.deflate(get_fields.map{|f| f.to_out }.join)
+	end
+end
+
+class Base64Encode < Action
+	def do_it
+		require 'base64'
+		# need the chomp b/c it has an extra \n
+		Base64.encode64(get_fields.map{|f| f.to_out }.join).chomp
+	end
+end
+
+class Unicode < Action
+	def do_it
+		tmp = get_fields.map{|f| f.to_out }.join
+		res = ""
+		tmp.each_byte do |b|
+			res << b.chr + "\x00"
+		end
+		res
+	end
+end
+
+class NullTerminate < Action
+	def do_it
+		get_fields.map{|f| f.to_out }.join + "\x00"
 	end
 end
 
