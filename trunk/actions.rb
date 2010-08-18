@@ -27,7 +27,7 @@ require 'funder'
 require 'fields'
 
 class Action
-	attr_accessor :parent, :block
+	attr_accessor :parent, :block, :fields
 	def initialize(block=nil)
 		@block = block
 	end
@@ -44,8 +44,20 @@ class Action
 		self.class.class_eval { alias :get_fields :real_get_fields }
 		result
 	end
-	def inspect
-		"Action:#{self.class.to_s}"
+	def inspect(level=0)
+		@fields ||= get_fields()
+		fields_str = fields.map do |field|
+			field.name
+		end.join(", ")
+		if level == 0
+			return "#<Action:#{self.class.to_s} fields=[#{fields_str}]>"
+		elsif level == 1
+			return "Action:#{self.class.to_s}(#{fields_str})"
+		elsif level == 2
+			return "Action:#{self.class.to_s}(#{fields_str})"
+		else
+			return ""
+		end
 	end
 end
 
@@ -127,8 +139,16 @@ class ConditionalAction < Action
 		return @else.send(method, *args) if @else
 		""
 	end
-	def inspect
-		"CondAction:#{self.class.to_s}"
+	def inspect(level=0)
+		if level == 0
+			return "#<CondAction:#{self.class.to_s}>"
+		elsif level == 1
+			return "CondAction:#{self.class.to_s}"
+		elsif level == 2
+			return "CondAction:#{self.class.to_s}"
+		else
+			return ""
+		end
 	end
 end
 
