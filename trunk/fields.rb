@@ -60,7 +60,7 @@ class Field
 		end
 	end
 	def root
-		@root = begin
+		@root ||= begin
 			tmp = @parent
 			while true
 				break if tmp.parent == nil
