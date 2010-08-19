@@ -32,6 +32,7 @@ class Field
 	def initialize(name, value, options={})
 		@name = name
 		@value = value
+		@value.owner = self if @value.respond_to?(:owner=)
 		@options = options || {}
 		@parent = nil
 
@@ -41,8 +42,8 @@ class Field
 	end
 	# inheriting classes need to implement this as well (and call super)
 	def pull_options
-		if @options[:action]
-			@action = @options[:action].create
+		if (act = (@options[:action] || @options[:a]))
+			@action = act.create
 		end
 	end
 	def set_val_parent
