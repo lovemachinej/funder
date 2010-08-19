@@ -28,7 +28,7 @@ require 'actions'
 require 'base64'
 
 class Field
-	attr_accessor :name, :value, :parent, :options, :cache, :action
+	attr_accessor :name, :value, :parent, :options, :cache, :action, :root
 	def initialize(name, value, options={})
 		@name = name
 		@value = value
@@ -59,8 +59,44 @@ class Field
 			@value
 		end
 	end
+	def root
+		@root = begin
+			tmp = @parent
+			while true
+				break if tmp.parent == nil
+				tmp = tmp.parent
+			end
+			tmp
+		end
+		@root
+	end
+	def length_up_to(field)
+		res = 0
+		@order.each do |child|
+			break if child == field
+			if child.has_child(field)
+				res += child.length_up_to(field)
+				break
+			else
+				res += child.result_length
+			end
+		end
+		res
+	end
+	def has_child(child)
+		return true if child == self
+		return false unless  @order
+		@order.each do |field|
+			return true if field.has_child(child)
+		end
+		return false
+	end
+	def offset
+		base = root
+		base.length_up_to(self)
+	end
 	def to_out
-		return @cache if @cache
+		return @cache.clone if @cache
 		res = ""
 		if @value.kind_of? Proc
 			res = @parent.instance_eval &@value
@@ -75,6 +111,7 @@ class Field
 		end
 
 		@cache ||= gen_val(res)
+		return @cache.clone
 	end
 	def gen_val(v)
 		v
