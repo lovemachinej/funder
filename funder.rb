@@ -68,7 +68,12 @@ end
 
 class PreAction
 	def initialize(klass, *args)
-		@klass = klass
+		if klass.kind_of? Proc
+			@klass = CustomAction
+			args.insert(0, klass)
+		else
+			@klass = klass
+		end
 		@args = args
 	end
 	def create

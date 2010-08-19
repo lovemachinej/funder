@@ -27,10 +27,11 @@ require 'funder'
 require 'fields'
 
 class Action
-	attr_accessor :parent, :block, :fields
+	attr_accessor :parent, :block, :fields, :owner
 	def initialize(block=nil, do_it_once_str=nil)
 		@block = block
 		@do_it_once_str = do_it_once_str
+		@owner = nil
 	end
 	def get_fields
 		if @do_it_once_str
@@ -43,6 +44,8 @@ class Action
 			end
 		elsif @block
 			@parent.instance_eval &block
+		elsif @owner
+			[@owner]
 		end
 	end
 	def do_it
@@ -61,6 +64,7 @@ class Action
 	end
 	def inspect(level=0)
 		@fields ||= get_fields() || []
+		puts @field.inspect
 		fields_str = @fields.map do |field|
 			field.name
 		end.join(", ")
@@ -128,10 +132,29 @@ class NullTerminate < Action
 	end
 end
 
+class Offset < Action
+	def do_it
+		fields = get_fields
+		raise "this action can only be done on _one_ field" if fields.length > 1
+		fields[0].offset
+	end
+end
+
 #Default Action
 class DA < Action
 	def do_it
 		get_fields.map{|f| f.to_out }.join
+	end
+end
+
+class CustomAction < Action
+	attr_accessor :custom_proc
+	def initialize(custom_proc, block=nil, do_it_once_str=nil)
+		super(block, do_it_once_str)
+		@custom_proc = custom_proc
+	end
+	def do_it
+		@custom_proc.call(get_fields)
 	end
 end
 
