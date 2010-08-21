@@ -106,12 +106,11 @@ class Field
 		else
 			res = @value
 		end
-
+		res = gen_val(res)
 		if @action
 			res = @action.do_it_once(res)
 		end
-
-		@cache ||= gen_val(res)
+		@cache = res
 		return @cache.clone
 	end
 	def gen_val(v)
