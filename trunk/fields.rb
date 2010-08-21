@@ -98,13 +98,13 @@ class Field
 	end
 	def to_out
 		return @cache.clone if @cache
-		res = ""
-		if @value.kind_of? Proc
-			res = @parent.instance_eval &@value
-		elsif @value.kind_of? Action
-			res = @value.do_it
-		else
-			res = @value
+		res = @value
+		while ([Proc, Action] & res.class.ancestors).length > 0
+			if res.kind_of? Proc
+				res = @parent.instance_eval &res
+			elsif res.kind_of? Action
+				res = res.do_it
+			end
 		end
 		res = gen_val(res)
 		if @action
