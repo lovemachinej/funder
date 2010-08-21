@@ -134,6 +134,9 @@ class Funder < Str
 		@unfields = []
 		self.class.order.each {|f| create_field(f.clone, @order) }
 		self.class.unfields.each {|uf| create_field(uf.clone, @unfields)}
+		# this means we are the root node and need to tell all children nodes
+		# that they can init now (everything should be created by now)
+		init if @parent == nil
 	end
 	def create_field(pre_field, dest)
 		self.class.class_eval { attr_accessor pre_field.name }
