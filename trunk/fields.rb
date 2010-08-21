@@ -35,10 +35,17 @@ class Field
 		@value.owner = self if @value.respond_to?(:owner=)
 		@options = options || {}
 		@parent = nil
+		@inited = false
 
 		pull_options()
 
 		set_val_parent
+	end
+	# subclasses should override this and implement their own init code
+	# (don't forget to call super() though)
+	def init
+		@inited = true
+		@order.each {|f| f.init } if @order
 	end
 	# inheriting classes need to implement this as well (and call super)
 	def pull_options
@@ -52,6 +59,21 @@ class Field
 	def parent=(val)
 		@parent = val
 		set_val_parent
+	end
+	# walk up the tree to the root, resetting along the way
+	def tree_shoot_reset
+		reset
+		tmp = @parent
+		return unless tmp
+		while true
+			tmp.reset
+			break unless tmp.parent
+			tmp = tmp.parent
+		end
+	end
+	def value=(new_val)
+		tree_shoot_reset
+		@value = new_val
 	end
 	def value
 		if @value.kind_of? Proc
@@ -145,10 +167,9 @@ class Field
 	end
 	def inspect(level=0)
 		if level == 0
-
 			res = "#<#{self.class.to_s} name=#{@name.to_s.inspect} value=#{inspect_value}"
 			if @cache
-				res << " cache=#{(@cache.length > 17 ? @cache.slice(0, 17) + "..." : @cache).inspect}"
+				res << " cache=#{(@cache.length > 20 ? @cache.slice(0, 17) + "..." : @cache).inspect}"
 			else
 				res << " cache=nil"
 			end
@@ -217,11 +238,16 @@ class MultField < Str
 		@order = []
 		@klass = klass
 		super(name, value, options)
-
-		min = @options[:mult_min] || 1
-		max = @options[:mult_max] || rand(10) + 1
-		min,max = max,min if min > max
-		create_fields(rand(max-min+1) + min)
+	end
+	def init
+		create_fields(rand(@mult_max - @mult_min) + @mult_min)
+		super()
+	end
+	def pull_options
+		super()
+		@mult_min = @options[:mult_min] || 1
+		@mult_max = @options[:mult_max] || rand(10) + 2
+		@mult_min,@mult_max = @mult_max,@mult_min if @mult_min > @mult_max
 	end
 	def create_fields(num)
 		@order = []
@@ -231,12 +257,10 @@ class MultField < Str
 	end
 	# in this case, we don't want the default inspect function
 	def inspect(level=0)
-		if level==0
-			return "#<#{@klass.to_s}* length=#{length}>"
-		elsif level==1
-			return "#<#{@klass.to_s}>"
+		if level==0 || level == 1
+			return "#<#{@klass.to_s}[#{length}]>"
 		elsif level==2
-			return @klass.to_s
+			return "#{@klass.to_s}[#{length}]"
 		else
 			return ""
 		end
@@ -245,9 +269,11 @@ class MultField < Str
 		@order[int]
 	end
 	def length=(num)
+		tree_shoot_reset
 		create_fields(num) unless @order.length == num
 	end
 	def length
+		init unless @inited
 		@order.length
 	end
 	def result_length
@@ -275,9 +301,7 @@ end
 class Int < Field
 	attr_accessor :pack
 	def gen_val(v)
-		min = @options[:min] || 0
-		max = @options[:max] || (1<<32)-1
-		val = v || rand(max - min) + min
+		val = v || rand(@max - @min) + @min
 		[val].pack(@pack)
 	end
 	def result_length
@@ -297,6 +321,8 @@ class Int < Field
 	end
 	def pull_options
 		super()
+		@min = @options[:min] || 0
+		@max = @options[:max] || 0xffff
 		@pack ||= @options[:p] || "N"
 	end
 	def detail_inspect(level=0)

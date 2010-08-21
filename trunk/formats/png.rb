@@ -278,7 +278,7 @@ class Png < Funder
 	# field :phys, PHYS
 	# field :time, TIME
 	field :idat, IDAT
-	# field :text, TEXT, nil, :mult=>true, :mult_max=>2
+	field :text, TEXT, nil, :mult=>true, :mult_max=>2
 	# field :ztxt, ZTXT, nil, :mult=>true, :mult_max=>2
 	# field :itxt, ITXT, nil, :mult=>true, :mult_max=>2
 	field :iend, IEND

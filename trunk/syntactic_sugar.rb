@@ -61,4 +61,10 @@ module SyntacticSugar
 	def unicode_str(name, value=nil, options={})
 		field(name, Str, value, {:action=>action(Unicode)}.merge(options))
 	end
+ 
+ 	# misc sugar
+ 
+ 	def array(name, klass, options={})
+ 		field(name, klass, nil, {:mult=>true}.merge(options))
+ 	end
 end
