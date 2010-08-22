@@ -24,6 +24,7 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 
 require 'fields'
+require 'values'
 require 'actions'
 require 'syntactic_sugar'
 
@@ -59,7 +60,7 @@ class PreField
 	def create
 		@value = @value.create if @value.respond_to?(:create)
 		if @options[:mult]
-			MultField.new(@klass, @name, @value, @options)
+			MultiField.new(@klass, @name, @value, @options)
 		else
 			@klass.new(@name, @value, @options)
 		end
@@ -117,6 +118,13 @@ class Funder < Str
 		def action(klass, *args)
 			PreAction.new(klass, *args)
 		end
+		def bind(bind_lambda, fields_map=nil)
+			if fields_map == nil
+				return BoundValue.new(bind_lambda)
+			else
+				return MultiBoundValue.new(bind_lambda, fields_map)
+			end
+		end
 		def inherited(klass)
 			@order ||= []
 			@unfields ||= []
@@ -130,6 +138,7 @@ class Funder < Str
 	attr_accessor :order, :unfields
 	def initialize(*args)
 		super(*args) if args.length == 3
+		@options = {}
 		@order = []
 		@unfields = []
 		self.class.order.each {|f| create_field(f.clone, @order) }
