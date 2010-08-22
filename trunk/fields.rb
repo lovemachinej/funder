@@ -24,11 +24,13 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 
 require 'funder'
+require 'values'
 require 'actions'
-require 'base64'
+require 'events'
 
 class Field
-	attr_accessor :name, :value, :parent, :options, :cache, :action, :root
+	include EventDispatcher
+	attr_accessor :name, :value, :parent, :options, :cache, :action, :root, :binding, :owner
 	def initialize(name, value, options={})
 		@name = name
 		@value = value
@@ -36,25 +38,32 @@ class Field
 		@options = options || {}
 		@parent = nil
 		@inited = false
-
+		@binding = nil
+		@owner = nil
 		pull_options()
-
-		set_val_parent
 	end
 	# subclasses should override this and implement their own init code
 	# (don't forget to call super() though)
 	def init
+		set_val_parent
 		@inited = true
 		@order.each {|f| f.init } if @order
 	end
 	# inheriting classes need to implement this as well (and call super)
 	def pull_options
+		if (p = (@options[:parent]))
+			@parent = p
+		end
 		if (act = (@options[:action] || @options[:a]))
 			@action = act.create
+		end
+		if (binding = (@options[:b] || @options[:bind]))
+			@binding = binding
 		end
 	end
 	def set_val_parent
 		@value.parent = @parent if @value.respond_to?(:parent=)
+		@binding.parent = @parent if @binding
 	end
 	def parent=(val)
 		@parent = val
@@ -121,11 +130,13 @@ class Field
 	def to_out
 		return @cache.clone if @cache
 		res = @value
-		while ([Proc, Action] & res.class.ancestors).length > 0
+		while ([Proc, Action, Value] & res.class.ancestors).length > 0
 			if res.kind_of? Proc
 				res = @parent.instance_eval &res
 			elsif res.kind_of? Action
 				res = res.do_it
+			elsif res.kind_of? Value
+				res = res.resolve
 			end
 		end
 		res = gen_val(res)
@@ -229,7 +240,7 @@ class Str < Field
 	end
 end
 
-class MultField < Str
+class MultiField < Str
 	include Enumerable
 
 	attr_accessor :order
@@ -237,10 +248,19 @@ class MultField < Str
 	def initialize(klass, name, value, options)
 		@order = []
 		@klass = klass
+		create_listener(:length_changed)
 		super(name, value, options)
 	end
-	def init
-		create_fields(rand(@mult_max - @mult_min) + @mult_min)
+	def init(pick_one=false)
+		@inited = true
+		num_fields = rand(@mult_max - @mult_min) + @mult_min
+		if @binding && !pick_one
+			bound_to = @binding.resolve
+			if bound_to.kind_of? MultiField
+				num_fields = bound_to.length
+			end
+		end
+		create_fields(num_fields)
 		super()
 	end
 	def pull_options
@@ -252,8 +272,11 @@ class MultField < Str
 	def create_fields(num)
 		@order = []
 		num.times do |i|
-			@order << @klass.new("#{name}[#{i}]".to_sym, value, options)
+			new_field = @klass.new("#{name}[#{i}]".to_sym, value, {:parent=>self}.merge(@options))
+			new_field.owner = self
+			@order << new_field
 		end
+		@binding.bind_fields(@order) if @binding
 	end
 	# in this case, we don't want the default inspect function
 	def inspect(level=0)
@@ -271,9 +294,13 @@ class MultField < Str
 	def length=(num)
 		tree_shoot_reset
 		create_fields(num) unless @order.length == num
+		dispatch_event(:length_changed)
 	end
+	# if someone is trying to get the length and we haven't been inited yet, it's
+	# because we're stuck in a loop with both sides trying to get the length of
+	# eachother
 	def length
-		init unless @inited
+		init(true) unless @inited
 		@order.length
 	end
 	def result_length
@@ -285,6 +312,7 @@ class MultField < Str
 	end
 	def set_val_parent
 		@order.each {|f| f.parent = @parent}
+		@binding.parent = @parent if @binding
 	end
 	def gen_val(v)
 		@order.map{|f| f.to_out}.join
