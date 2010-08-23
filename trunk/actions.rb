@@ -64,7 +64,6 @@ class Action
 	end
 	def inspect(level=0)
 		@fields ||= get_fields() || []
-		puts @field.inspect
 		fields_str = @fields.map do |field|
 			field.name
 		end.join(", ")

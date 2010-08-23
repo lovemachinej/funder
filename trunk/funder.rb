@@ -204,9 +204,4 @@ class Section < Funder
 		@parent = val
 		@action.parent = @parent if @action
 	end
-	def gen_val(*args)
-		out = super
-		out = @action.do_it_once(out) if @action
-		out
-	end
 end
