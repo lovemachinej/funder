@@ -72,3 +72,54 @@ class MultiBoundValue < BoundValue
 		end
 	end
 end
+
+class Counter < Value
+	# keeps track of counters values based on a unique name and the obj_id of the root class
+	module CounterManager
+	class << self
+		def reset(obj_id)
+		end
+		def create_counter(obj_id, name, start_num, incrementor)
+			@counters ||= {}
+			@counters[obj_id] ||= {}
+			# don't clobber existing counters
+			return if @counters[obj_id][name]
+			@counters[obj_id][name] = {}
+			@counters[obj_id][name][:start_num] = start_num
+			@counters[obj_id][name][:incrementor] = incrementor
+			@counters[obj_id][name][:next_val] = start_num
+		end
+		def next_number(obj_id, name)
+			res = @counters[obj_id][name][:next_val]
+			@counters[obj_id][name][:next_val] += @counters[obj_id][name][:incrementor]
+			res
+		end
+	end # class << self
+	end # CounterManager
+
+	attr_accessor :start_num, :incrementor, :my_number
+	def initialize(name, start_num=0, incrementor=1, replace=true)
+		@start_num = start_num
+		@my_number = nil
+		@name = name
+		@incrementor = incrementor
+		@replace = replace
+	end
+	def parent=(val)
+		@parent = val
+		# at this point, we can find the root field and create a counter in Counter_Manager
+		@root_obj_id = @owner.root.object_id
+		CounterManager.create_counter(@root_obj_id, @name, @start_num, @incrementor)
+		val = CounterManager.next_number(@root_obj_id, @name)
+		if @replace
+			@owner.value = val
+		else
+			@my_number = val
+		end
+		val
+	end
+	def resolve
+		# @my_number should have been set by now
+		@my_number
+	end
+end
