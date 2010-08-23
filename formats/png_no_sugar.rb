@@ -25,36 +25,28 @@
 
 require 'funder'
 
-class Png < Funder
-	COLOR_TYPE_GREYSCALE = 0
-	COLOR_TYPE_TRUECOLOR = 2
-	COLOR_TYPE_INDEXED_COLOR = 3
-	COLOR_TYPE_GREYSCALE_WITH_ALPHA = 4
-	COLOR_TYPE_TRUECOLOR_WITH_ALPHA = 6
-end
-
 class Chunk < Funder
-	int32 :length, action(Length, lambda{[data]})
-	str :type_code, nil, :min=>4
-	str :data
-	int32 :crc, action(Crc32, lambda{[type_code,data]})
+	field :length, Int, action(Length, lambda{[data]})
+	field :type_code, Str, nil, :min=>4
+	field :data, Str, nil
+	field :crc, Int, action(Crc32, lambda{[type_code,data]})
 end
 
 class IHDR < Chunk
-	str :type_code, "IHDR"
+	field :type_code, Str, "IHDR"
 	section :data do
-		int32 :width
-		int32 :height 
-		byte :bit_depth, 8
-		byte :color_type, Png::COLOR_TYPE_TRUECOLOR
-		byte :comp_method, 0
-		byte :filter_method, 0
-		byte :interlace_method, 0
+		field :width, Int
+		field :height, Int
+		field :bit_depth, Int, 8, :p=>'c'
+		field :color_type, Int, 2, :p=>'c'
+		field :comp_method, Int, 0, :p=>'c'
+		field :filter_method, Int, 0, :p=>'c'
+		field :interlace_method, Int, 0, :p=>'c'
 	end
 end
 
 class IDAT < Chunk
-	str :type_code, "IDAT"
+	field :type_code, Str, "IDAT"
 	section(:data, action(ZlibDeflate)) do
 		unfield :height, Int, nil, :p=>'c'
 		unfield :width, Int, nil, :p=>'c'
@@ -64,12 +56,12 @@ class IDAT < Chunk
 		unfield :blue, Int, 255
 		unfield :color_type, Int
 
-		str :pixel_data, lambda {
+		field :pixel_data, Str, lambda {
 			w = width.value || @parent.parent.ihdr.data.width.value || rand(10)+1
 			h = height.value || @parent.parent.ihdr.data.height.value || rand(10)+1
 			c_type = color_type.value || @parent.parent.ihdr.data.color_type.value || 2
 			case c_type
-			when Png::COLOR_TYPE_TRUECOLOR # (no alpha)
+			when 2 # true color
 				h.times.map do
 					"\x00" +
 					w.times.map do
@@ -79,7 +71,7 @@ class IDAT < Chunk
 						r.chr + g.chr + b.chr
 					end.join
 				end.join
-			when Png::COLOR_TYPE_TRUECOLOR_WITH_ALPHA
+			when 6 # true color w/ alpha
 				h.times.map do
 					"\x00" +
 					w.times.map do
@@ -106,103 +98,108 @@ class IDAT < Chunk
 end
 
 class SRGB < Chunk
-	str :type_code, "sRGB"
+	field :type_code, Str, "sRGB"
 	section :data do
-		byte :rend_intent, 0
+		field :rend_intent, Int, 0, :p=>'c'
 	end
 end
 
 class TEXT < Chunk
-	str :type_code, "tEXt"
+	field :type_code, Str, "tEXt"
 	section :data do
-		c_str :keyword, "Comment", :max=>79
-		str :text, "tEXT text"
+		field :keyword, Str, "Comment", :max=>79
+		field :null, Str, "\x00"
+		field :text, Str, "tEXT text"
 	end
 end
 
 class ZTXT < Chunk
-	str :type_code, "zTXt"
+	field :type_code, Str, "zTXt"
 	section :data do
-		c_str :keyword, "Comment", :max=>79
-		byte :comp_meth, 0
+		field :keyword, Str, "Comment", :max=>79
+		field :null, Str, "\x00"
+		field :comp_meth, Int, 0, :p=>'c'
 		section(:compressed_text, action(ZlibDeflate)) do
-			str :text, "zTXt text"
+			field :text, Str, "zTXt text"
 		end
 	end
 end
 
 class ITXT < Chunk
-	str :type_code, "iTXt"
+	field :type_code, Str, "iTXt"
 	section :data do
-		c_str :keyword, "Comment", :max=>79
-		byte :comp_flag, 1
-		byte :comp_method, 0
-		c_str :language_tag, "en-us"
-		c_str :translated_text, "translated text"
+		field :keyword, Str, "Comment", :max=>79
+		field :null_1, Str, "\x00"
+		field :comp_flag, Int, 1, :p=>'c'
+		field :comp_method, Int, 0, :p=>'c'
+		field :language_tag, Str, "en-us"
+		field :null_2, Str, "\x00"
+		field :translated_text, Str, "translated text"
+		field :null_3, Str, "\x00"
 
 		unfield :comp_text, Bool, lambda { comp_flag.value == 1 }
 		section(:text, action(If, lambda{comp_text.value}, 
 								action(ZlibDeflate),
 								action(DA))) do
-			str :actual_text, "ACTUAL TEXT"
+			field :actual_text, Str, "ACTUAL TEXT"
 		end
 	end
 end
 
 class TRNS < Chunk
-	str :type_code, "tRNS"
+	field :type_code, Str, "tRNS"
 	section :data do
 		# assuming color type == 2
-		int32 :red_sample_value, 200, :max=>255
-		int32 :blue_sample_value, 100, :max=>255
-		int32 :green_sample_value, 50, :max=>255
+		field :red_sample_value, Int, 200, :p=>'n', :max=>255
+		field :blue_sample_value, Int, 100, :p=>'n', :max=>255
+		field :green_sample_value, Int, 50, :p=>'n', :max=>255
 	end
 end
 
 class CHRM < Chunk
-	str :type_code, "cHRM"
+	field :type_code, Str, "cHRM"
 	section :data do
-		int32 :white_point_x, 5000, :min=>10, :max=>10000
-		int32 :white_point_y,  5000, :min=>10, :max=>10000
-		int32 :red_x, 5000, :min=>10, :max=>10000
-		int32 :red_y, 5000, :min=>10, :max=>10000
-		int32 :green_x, 5000, :min=>10, :max=>10000
-		int32 :green_y, 5000, :min=>10, :max=>10000
-		int32 :blue_x, 5000, :min=>10, :max=>10000
-		int32 :blue_y, 5000, :min=>10, :max=>10000
+		field :white_point_x, Int, 5000, :min=>10, :max=>10000
+		field :white_point_y, Int,  5000, :min=>10, :max=>10000
+		field :red_x, Int, 5000, :min=>10, :max=>10000
+		field :red_y, Int, 5000, :min=>10, :max=>10000
+		field :green_x, Int, 5000, :min=>10, :max=>10000
+		field :green_y, Int, 5000, :min=>10, :max=>10000
+		field :blue_x, Int, 5000, :min=>10, :max=>10000
+		field :blue_y, Int, 5000, :min=>10, :max=>10000
 	end
 end
 
 class SBIT < Chunk
-	str :type_code, "sBIT"
+	field :type_code, Str, "sBIT"
 	section :data do
-		byte :sig_red_bits, 200
-		byte :sig_green_bits, 100
-		byte :sig_blue_bits, 50
+		field :sig_red_bits, Int, 200, :p=>'c'
+		field :sig_green_bits, Int, 100, :p=>'c'
+		field :sig_blue_bits, Int, 50, :p=>'c'
 	end
 end
 
 class GAMA < Chunk
-	str :type_code, "gAMA"
+	field :type_code, Str, "gAMA"
 	section :data do
-		int32 :image_gama, 1000
+		field :image_gama, Int, 1000
 	end
 end
 
 class BKGD < Chunk
-	str :type_code, "bKGD"
+	field :type_code, Str, "bKGD"
 	section :data do
-		int32 :red, 200
-		int32 :green, 100
-		int32 :blue, 50
+		field :red, Int, 200, :p=>'n'
+		field :green, Int, 100, :p=>'n'
+		field :blue, Int, 50, :p=>'n'
 	end
 end
 
 class HIST < Chunk
-	str :type_code, "hIST"
+	field :type_code, Str, "hIST"
 	section :data do
 		unfield :num_entries, Int, lambda { @parent.parent.plte.data.entries.length }
-		str :entries, lambda {
+		field :entries, Str, lambda {
 			num = num_entries.value || 10 
 			num.times.map{"CCCC"}.join
 		}
@@ -210,78 +207,79 @@ class HIST < Chunk
 end
 
 class PlteEntry < Funder
-	byte :red, 61
-	byte :green, 51
-	byte :blue, 41
+	field :red, Int, 61, :p=>'c'
+	field :green, Int, 51, :p=>'c'
+	field :blue, Int, 41, :p=>'c'
 end
 
 class PLTE < Chunk
-	str :type_code, "PLTE"
+	field :type_code, Str, "PLTE"
 	section :data do
 		field :entries, PlteEntry, nil, :mult=>true, :mult_min=>1, :mult_max=>256
 	end
 end
 
 class PHYS < Chunk
-	str :type_code, "pHYs"
+	field :type_code, Str, "pHYs"
 	section :data do
-		int32 :pixels_per_unit_x, 1
-		int32 :pixels_per_unit_y, 1
-		byte :unit_specifier, 1
+		field :pixels_per_unit_x, Int, 1
+		field :pixels_per_unit_y, Int, 1
+		field :unit_specifier, Int, 1, :p=>'c'
 	end
 end
 
 class SpltEntry < Funder
-	int32 :red, 200
-	int32 :green, 100
-	int32 :blue, 50
-	int32 :alpha, 150
-	int32 :frequency, 100
+	field :red, Int, 200, :p=>'n'
+	field :green, Int, 100, :p=>'n'
+	field :blue, Int, 50, :p=>'n'
+	field :alpha, Int, 150, :p=>'n'
+	field :frequency, Int, 100, :p=>'n'
 end
 
 class SPLT < Chunk
-	str :type_code, "sPLT"
+	field :type_code, Str, "sPLT"
 	section :data do
-		c_str :palette_name, "palette name", :min=>1, :max=>79
-		byte :sample_depth, 16
+		field :palette_name, Str, "palette name", :min=>1, :max=>79
+		field :null_sep, Str, "\x00"
+		field :sample_depth, Int, 16, :p=>'c'
 		field :palette_entries, SpltEntry, nil, :mult=>true, :mult_min=>1
 	end
 end
 
 class TIME < Chunk
-	str :type_code, "tIME"
+	field :type_code, Str, "tIME"
 	section :data do
-		int32 :year, 2010
-		byte :month, 5, :min=>1, :max=>12
-		byte :day, 10, :min=>1, :max=>31
-		byte :hour, 6, :min=>0, :max=>23
-		byte :minute, 30, :min=>0, :max=>59
-		byte :second, 15, :min=>0, :max=>60
+		field :year, Int, 2010, :p=>'n'
+		field :month, Int, 5, :p=>'c', :min=>1, :max=>12
+		field :day, Int, 10, :p=>'c', :min=>1, :max=>31
+		field :hour, Int, 6, :p=>'c', :min=>0, :max=>23
+		field :minute, Int, 30, :p=>'c', :min=>0, :max=>59
+		field :second, Int, 15, :p=>'c', :min=>0, :max=>60
 	end
 end
 
 class IEND < Chunk
-	str :type_code, "IEND"
-	str :data, ""
+	field :type_code, Str, "IEND"
+	field :data, Str, ""
 end
 
 class Png < Funder
-	str :png_header, "\211PNG\r\n\032\n"
+	field :png_header, Str, "\211PNG\r\n\032\n"
 	field :ihdr, IHDR
 	# field :chrm, CHRM
 	field :srgb, SRGB
 	# field :sbit, SBIT
 	# field :trns, TRNS
 	# field :gama, GAMA
-	# array :splt, SPLT, :mult_max=>2
+	# field :splt, SPLT, nil, :mult=>true, :mult_max=>2
 	# field :bkgd, BKGD
 	# field :plte, PLTE
 	# field :hist, HIST
 	# field :phys, PHYS
 	# field :time, TIME
 	field :idat, IDAT
-	array :text, TEXT, :mult_max=>2
-	# array :ztxt, ZTXT, :mult_max=>2
-	# array :itxt, ITXT, :mult_max=>2
+	field :text, TEXT, nil, :mult=>true, :mult_max=>2
+	# field :ztxt, ZTXT, nil, :mult=>true, :mult_max=>2
+	# field :itxt, ITXT, nil, :mult=>true, :mult_max=>2
 	field :iend, IEND
 end
