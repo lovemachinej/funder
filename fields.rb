@@ -117,7 +117,7 @@ class Field
 	end
 	def has_child(child)
 		return true if child == self
-		return false unless  @order
+		return false unless @order
 		@order.each do |field|
 			return true if field.has_child(child)
 		end
@@ -253,8 +253,8 @@ class MultiField < Str
 	end
 	def init(pick_one=false)
 		@inited = true
-		num_fields = rand(@mult_max - @mult_min) + @mult_min
-		if @binding && !pick_one
+		num_fields = @length || rand(@mult_max - @mult_min) + @mult_min
+		if @binding && !pick_one && !@length
 			bound_to = @binding.resolve
 			if bound_to.kind_of? MultiField
 				num_fields = bound_to.length
@@ -265,6 +265,7 @@ class MultiField < Str
 	end
 	def pull_options
 		super()
+		@length = @options[:l] || @options[:length]
 		@mult_min = @options[:mult_min] || 1
 		@mult_max = @options[:mult_max] || rand(10) + 2
 		@mult_min,@mult_max = @mult_max,@mult_min if @mult_min > @mult_max
@@ -274,6 +275,7 @@ class MultiField < Str
 		num.times do |i|
 			new_field = @klass.new("#{name}[#{i}]".to_sym, value, {:parent=>self}.merge(@options))
 			new_field.owner = self
+			new_field.parent = @parent
 			@order << new_field
 		end
 		@binding.bind_fields(@order) if @binding
@@ -298,7 +300,7 @@ class MultiField < Str
 	end
 	# if someone is trying to get the length and we haven't been inited yet, it's
 	# because we're stuck in a loop with both sides trying to get the length of
-	# eachother
+	# eachother, so we'll init() now if not done already
 	def length
 		init(true) unless @inited
 		@order.length

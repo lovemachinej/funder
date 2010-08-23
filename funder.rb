@@ -125,6 +125,9 @@ class Funder < Str
 				return MultiBoundValue.new(bind_lambda, fields_map)
 			end
 		end
+		def counter(name, start_num=0, incrementor=1, replace=true)
+			return Counter.new(name, start_num, incrementor, replace)
+		end
 		def inherited(klass)
 			@order ||= []
 			@unfields ||= []
@@ -154,10 +157,17 @@ class Funder < Str
 		dest << field
 		instance_variable_set("@#{pre_field.name}", field)
 	end
+	def result_length
+		res = 0
+		@order.each do |field|
+			res += field.result_length
+		end
+		res
+	end
 	def gen_val(*args)
 		return @value if @value
 		res = ""
-		@order.map {|f|	res << f.to_out }
+		@order.map {|f| res << f.to_out	}
 		res
 	end
 	def reset
