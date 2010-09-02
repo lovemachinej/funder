@@ -79,6 +79,12 @@ class Action
 	end
 end
 
+class ReversibleAction < Action
+	def reverse_it(data)
+		raise "this should be implemented by inherited classes"
+	end
+end
+
 class Length < Action
 	def do_it
 		get_fields.map{|f| f.to_out }.join.length
@@ -93,28 +99,39 @@ class Crc32 < Action
 	end
 end
 
-class Reverse < Action
+class Reverse < ReversibleAction
 	def do_it
 		get_fields.map{|f| f.to_out }.join.reverse
 	end
+	def reverse_it(data)
+		data.reverse
+	end
 end
 
-class ZlibDeflate < Action
+class ZlibDeflate < ReversibleAction
 	def do_it
 		require 'zlib'
 		Zlib::Deflate.deflate(get_fields.map{|f| f.to_out }.join)
 	end
+	def reverse_it(data)
+		require 'zlib'
+		Zlib::Inflate.inflate(data)
+	end
 end
 
-class Base64Encode < Action
+class Base64Encode < ReversibleAction
 	def do_it
 		require 'base64'
 		# need the chomp b/c it has an extra \n
 		Base64.encode64(get_fields.map{|f| f.to_out }.join).chomp
 	end
+	def reverse_it(data)
+		require 'base64'
+		Base64.decode64(data)
+	end
 end
 
-class Unicode < Action
+class Unicode < ReversibleAction
 	def do_it
 		tmp = get_fields.map{|f| f.to_out }.join
 		res = ""
@@ -123,11 +140,25 @@ class Unicode < Action
 		end
 		res
 	end
+	def reverse_it(data)
+		res = ""
+		tmp = data.clone
+		while tmp.length > 0
+			char, null = tmp.unpack("ac")
+			return data if null != 0 || null == ""
+			res << char
+		end
+		res
+	end
 end
 
-class NullTerminate < Action
+class NullTerminate < ReversibleAction
 	def do_it
 		get_fields.map{|f| f.to_out }.join + "\x00"
+	end
+	def reverse_it(data)
+		return data.slice(0, data.length - 1) if data[-1, 1] == "\x00"
+		data
 	end
 end
 
