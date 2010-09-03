@@ -266,6 +266,13 @@ class IEND < Chunk
 end
 
 class Png < Funder
+	parse_info do
+		str :png_header, "\211PNG\r\n\032\n"
+		field :ihdr, IHDR
+		list_desc_of :chunks, Chunk
+		field :iend, IEND
+	end
+
 	str :png_header, "\211PNG\r\n\032\n"
 	field :ihdr, IHDR
 	# field :chrm, CHRM
