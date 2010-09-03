@@ -29,6 +29,14 @@ require 'actions'
 require 'events'
 
 class Field
+	class << self
+		def read_length(opts)
+			raise "this should be implemented by subclasses"
+		end
+		def parse(data, opts)
+			raise "this should be implemented by subclasses"
+		end
+	end # class << self
 	include EventDispatcher
 	attr_accessor :name, :value, :parent, :options, :cache, :action, :root, :binding, :owner
 	def initialize(name, value, options={})
@@ -201,9 +209,18 @@ class Field
 end
 
 class Str < Field
-	attr_accessor :charset, :min, :max
+	attr_accessor :charset, :min, :max, :length
+	class << self
+		def read_length(opts)
+			opts[:length] || -1
+		end
+		def parse(data, opts)
+			data
+		end
+	end # class << self
 	def pull_options
 		super()
+		@length = @options[:length]
 		@min = @options[:min] || rand(10)
 		@max = @options[:max] || rand(10)
 		@min,@max = @max,@min if @min > @max
@@ -211,7 +228,8 @@ class Str < Field
 		@charset = @options[:charset] || "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	end
 	def gen_rand
-		(rand(@max - @min)+@min).times.map{@charset[rand(@charset.length),1]}.join
+		length = @length || rand(@max - @min)+@min
+		length.times.map{@charset[rand(@charset.length),1]}.join
 	end
 	def gen_val(v)
 		val = v || gen_rand
@@ -330,6 +348,30 @@ end
 
 class Int < Field
 	attr_accessor :pack
+	class << self
+		def pack(opts)
+			opts[:p] || opts[:pack] || "N"
+		end
+		def read_length(opts)
+			p = pack(opts)
+			res = 0
+			if %w{D d E G Q q}.include? p
+				res = 8 # 64 bit
+			elsif %w{w}.include? p
+				res = 5 # 40 bit
+			elsif %w{e F f g I i L l N V}.include? p
+				res = 4 # 32 bit
+			elsif %w{n S s v}.include? p
+				res = 2 # 16 bit
+			elsif %w{C c}.include? p
+				res = 1 # 8 bit
+			end
+			res
+		end
+		def parse(data, opts)
+			data.unpack(pack(opts))[0]
+		end
+	end # class << self
 	def gen_val(v)
 		val = v || rand(@max - @min) + @min
 		[val].pack(@pack)

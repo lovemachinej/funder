@@ -25,47 +25,6 @@
 
 require 'funder'
 
-class Funder < Str
-	class << self
-		alias :original_field :field
-		def field(name, klass, value=nil, options={})
-			original_field(name, klass, value, options)
-			make_class_accessor(name, @order.find{|f| f.name == name})
-		end
-		alias :original_section :section
-		def section(name, action=nil, options={}, &block)
-			original_section(name, action, options, &block)
-			make_class_accessor(name, @order.find{|f| f.name == name})
-		end
-		alias :original_unfield :unfield
-		def unfield(name, klass, val=nil, options={})
-			original_unfield(name, klass, val, options)
-			make_class_accessor(name, @unfields.find{|f| f.name == name})
-		end
-		def make_class_accessor(name, val)
-			self.class_eval <<-RUBY
-				class << self ; attr_accessor :#{name} ; end
-			RUBY
-			instance_variable_set("@#{name}", val)
-		end
-
-		attr_accessor :descendants
-		alias :original_inherited :inherited
-		def inherited(klass)
-			original_inherited(klass)
-			@descendants ||= []
-			@descendants << klass
-
-			@order.each do |f|
-				klass.make_class_accessor(f.name, klass.order.find{|kf| kf.name == f.name})
-			end
-			@unfields.each do |uf|
-				klass.make_class_accessor(uf.name, klass.unfields.find{|kuf| kuf.name == uf.name})
-			end
-		end
-	end
-end
-
 class PreField
 	def setfuzzopt(opts={})
 		@fuzz_options = opts

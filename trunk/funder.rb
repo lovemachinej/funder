@@ -27,6 +27,7 @@ require 'fields'
 require 'values'
 require 'actions'
 require 'syntactic_sugar'
+require 'funder_parser'
 
 class Array
 	def append_or_replace(val, &block)
@@ -65,6 +66,19 @@ class PreField
 			@klass.new(@name, @value, @options)
 		end
 	end
+	def inspect
+		value_inspect = @value.inspect
+		value_inspect = @value.inspect(1) if @value.kind_of?(Action)
+		"#<PreField(#{klass.to_s}) @value=#{@value.inspect} @name=\"#{@name}\">"
+	end
+	def parse(data)
+		len = read_length
+		return nil if len == -1
+		@klass.parse(data.slice!(0, len), @options)
+	end
+	def read_length
+		@klass.read_length(@options)
+	end
 end
 
 class PreAction
@@ -92,18 +106,21 @@ end
 
 class Funder < Str
 	class << self
+		include FunderParser
 		include SyntacticSugar
 
-		attr_accessor :order
+		attr_accessor :order, :descendants
 		def field(name, klass, value=nil, options={})
 			@order ||= []
 			pf = PreField.new(name, klass, value, options, self)
 			@order.append_or_replace(pf) {|field| field.name == name}
+			make_class_accessor(name, pf)
 		end
 		def unfield(name, klass, val=nil, options={})
 			@unfields ||= []
 			pf = PreField.new(name, klass, val, options, self)
 			@unfields.append_or_replace(pf) {|field| field.name == name}
+			make_class_accessor(name, pf)
 		end
 		def section(name, action=nil, options={}, &block)
 			options[:action] = action
@@ -114,6 +131,7 @@ class Funder < Str
 			klass = class_eval new_class
 			klass.class_eval &block
 			field(name, klass, nil, options)
+			make_class_accessor(name, @order.find{|f| f.name == name})
 		end
 		def action(klass, *args)
 			PreAction.new(klass, *args)
@@ -128,6 +146,12 @@ class Funder < Str
 		def counter(name, start_num=0, incrementor=1, replace=true)
 			return Counter.new(name, start_num, incrementor, replace)
 		end
+		def make_class_accessor(name, val)
+			self.class_eval <<-RUBY
+				class << self ; attr_accessor :#{name} ; end
+			RUBY
+			instance_variable_set("@#{name}", val)
+		end
 		def inherited(klass)
 			@order ||= []
 			@unfields ||= []
@@ -136,8 +160,18 @@ class Funder < Str
 			klass.order = []
 			@order.each {|f| klass.order << f.clone ; klass.order.last.parent_class = klass }
 			@unfields.each {|uf| klass.unfields << uf.clone ; klass.unfields.last.parent_class = klass }
+			@descendants ||= []
+			@descendants << klass
+
+			@order.each do |f|
+				klass.make_class_accessor(f.name, klass.order.find{|kf| kf.name == f.name})
+			end
+			@unfields.each do |uf|
+				klass.make_class_accessor(uf.name, klass.unfields.find{|kuf| kuf.name == uf.name})
+			end
+			nil
 		end
-	end
+	end # class << self
 	attr_accessor :order, :unfields
 	def initialize(*args)
 		super(*args) if args.length == 3
