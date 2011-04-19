@@ -48,6 +48,9 @@ class Action
 			[@owner]
 		end
 	end
+	def self.action
+		raise "this should be implemented by inherited classes"
+	end
 	def do_it
 		raise "this should be done by inherited classes"
 	end
@@ -80,67 +83,81 @@ class Action
 end
 
 class ReversibleAction < Action
-	def reverse_it(data)
+	def self.reverse_it(data)
 		raise "this should be implemented by inherited classes"
 	end
 end
 
 class Length < Action
+	def self.action(data)
+		data.length
+	end
 	def do_it
-		get_fields.map{|f| f.to_out }.join.length
+		Length.action(get_fields.map{|f| f.to_out }.join)
 	end
 end
 
 class Crc32 < Action
-	def do_it
+	def self.action(data)
 		require 'zlib'
+		Zlib::crc32(data)
+	end
+	def do_it
 		res = get_fields.map{|f|f.to_out}.join
-		Zlib::crc32(res)
+		Crc32.action(res)
 	end
 end
 
 class Reverse < ReversibleAction
-	def do_it
-		get_fields.map{|f| f.to_out }.join.reverse
-	end
-	def reverse_it(data)
+	def self.action(data)
 		data.reverse
+	end
+	def self.reverse_it(data)
+		data.reverse
+	end
+	def do_it
+		Reverse.action(get_fields.map{|f| f.to_out }.join)
 	end
 end
 
 class ZlibDeflate < ReversibleAction
-	def do_it
+	def self.action(data)
 		require 'zlib'
-		Zlib::Deflate.deflate(get_fields.map{|f| f.to_out }.join)
+		Zlib::Deflate.deflate(data)
 	end
-	def reverse_it(data)
+	def self.reverse_it(data)
 		require 'zlib'
 		Zlib::Inflate.inflate(data)
+	end
+	def do_it
+		ZlibDeflate.action(get_fields.map{|f| f.to_out }.join)
 	end
 end
 
 class Base64Encode < ReversibleAction
-	def do_it
-		require 'base64'
-		# need the chomp b/c it has an extra \n
-		Base64.encode64(get_fields.map{|f| f.to_out }.join).chomp
-	end
-	def reverse_it(data)
+	def self.reverse_it(data)
 		require 'base64'
 		Base64.decode64(data)
+	end
+	def self.action(data)
+		require 'base64'
+		# need the chomp b/c it has an extra \n
+		Base64.encode64(data).chomp
+	end
+	def do_it
+		Base64Encode.action(get_fields.map{|f| f.to_out }.join)
 	end
 end
 
 class Unicode < ReversibleAction
-	def do_it
-		tmp = get_fields.map{|f| f.to_out }.join
+	def self.action(data)
 		res = ""
-		tmp.each_byte do |b|
+		data.each_byte do |b|
 			res << b.chr + "\x00"
 		end
 		res
 	end
-	def reverse_it(data)
+	def self.reverse_it(data)
 		res = ""
 		tmp = data.clone
 		while tmp.length > 0
@@ -150,15 +167,21 @@ class Unicode < ReversibleAction
 		end
 		res
 	end
+	def do_it
+		Unicode.action(get_fields.map{|f| f.to_out }.join)
+	end
 end
 
 class NullTerminate < ReversibleAction
-	def do_it
-		get_fields.map{|f| f.to_out }.join + "\x00"
+	def self.action(data)
+		data + "\x00"
 	end
-	def reverse_it(data)
+	def self.reverse_it(data)
 		return data.slice(0, data.length - 1) if data[-1, 1] == "\x00"
 		data
+	end
+	def do_it
+		NullTerminate.action(get_fields.map{|f| f.to_out }.join)
 	end
 end
 

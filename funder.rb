@@ -72,16 +72,19 @@ class PreField
 		"#<PreField(#{klass.to_s}) @value=#{@value.inspect} @name=\"#{@name}\">"
 	end
 	def parse(data)
+		puts "in PreField parse"
 		len = read_length
 		return nil if len == -1
-		@klass.parse(data.slice!(0, len), @options)
+		puts "  made it here"
+		@klass.parse(data.slice!(0, len), self)
 	end
 	def read_length
-		@klass.read_length(@options)
+		@klass.read_length(self)
 	end
 end
 
 class PreAction
+	attr_accessor :klass, :args
 	def initialize(klass, *args)
 		if klass.kind_of? Proc
 			@klass = CustomAction
@@ -209,13 +212,16 @@ class Funder < Str
 		@order.each {|f| f.reset }
 		nil
 	end
+	def detail_inspect(level=0)
+		""
+	end
 	def inspect(level=0)
 		if level == 0
 			res = "#<#{self.class.to_s} "
 			fields_str = @order.map do |field|
 				"#{field.name}=#{field.inspect(level+1)}"
 			end.join(" ")
-			res += fields_str + ">"
+			res += fields_str + " " + detail_inspect + ">"
 			return res
 		elsif level == 1
 			return "#<#{self.class.to_s}>"
@@ -237,5 +243,12 @@ class Section < Funder
 	def parent=(val)
 		@parent = val
 		@action.parent = @parent if @action
+	end
+	def detail_inspect(level=0)
+		if @action
+			"action=#{@action.inspect(level+1)}"
+		else
+			""
+		end
 	end
 end
