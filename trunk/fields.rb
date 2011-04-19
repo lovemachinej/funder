@@ -30,11 +30,25 @@ require 'events'
 
 class Field
 	class << self
-		def read_length(opts)
+		def read_length(pre_field)
 			raise "this should be implemented by subclasses"
 		end
-		def parse(data, opts)
+		def parse(data, pre_field)
 			raise "this should be implemented by subclasses"
+		end
+		def resolve_value(data, pre_field)
+			puts "resolving value"
+			new_val = data
+			action = begin
+				pre_field.value if pre_field.value.kind_of? ReversibleAction
+				pre_field.options[:action] || pre_field.options[:a]
+			end
+			# will be a PreAction right now
+			if action
+				puts "found an action for #{pre_field.name}, #{action.inspect}"
+				new_val = action.klass.reverse_it(data)
+			end
+			new_val
 		end
 	end # class << self
 	include EventDispatcher
@@ -211,11 +225,16 @@ end
 class Str < Field
 	attr_accessor :charset, :min, :max, :length
 	class << self
-		def read_length(opts)
-			opts[:length] || -1
+		def read_length(pre_field)
+			if pre_field.value.kind_of? String
+				
+			end
+			pre_field.options[:length] || -1
 		end
-		def parse(data, opts)
-			data
+		def parse(data, pre_field)
+			puts "parsing Str..."
+			tmp = resolve_value(data.clone)
+			tmp
 		end
 	end # class << self
 	def pull_options
@@ -352,8 +371,8 @@ class Int < Field
 		def pack(opts)
 			opts[:p] || opts[:pack] || "N"
 		end
-		def read_length(opts)
-			p = pack(opts)
+		def read_length(pre_field)
+			p = pack(pre_field.options)
 			res = 0
 			if %w{D d E G Q q}.include? p
 				res = 8 # 64 bit
@@ -368,8 +387,9 @@ class Int < Field
 			end
 			res
 		end
-		def parse(data, opts)
-			data.unpack(pack(opts))[0]
+		def parse(data, pre_field)
+			tmp = resolve_value(data)
+			data.unpack(tmp)[0]
 		end
 	end # class << self
 	def gen_val(v)
